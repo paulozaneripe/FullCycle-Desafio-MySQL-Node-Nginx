@@ -1,0 +1,65 @@
+networks:
+  mysql_node_nginx_net:
+    driver: bridge
+
+services:
+  mysql:
+    build:
+      context: ./mysql
+      dockerfile: Dockerfile
+    container_name: mysql
+    image: paulozaneripe/mysql
+    ports:
+      - '3306:3306'
+    environment:
+      MYSQL_DATABASE: 'desafio_mysql_node_nginx'
+      MYSQL_ROOT_PASSWORD: 'mysql'
+    volumes:
+      - mysql-volume:/var/lib/mysql
+    networks:
+      - mysql_node_nginx_net
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER --password=$$MYSQL_PASSWORD
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  node:
+    build:
+      context: ./node
+      dockerfile: Dockerfile
+    networks:
+      - mysql_node_nginx_net
+    restart: unless-stopped
+    volumes:
+      - ./node:/var/www/app
+      - node_modules:/var/www/app/node_modules
+    tty: true
+    container_name: node
+    image: paulozaneripe/node
+    ports:
+      - '3000:3000'
+    environment:
+      DB_HOST: 'mysql'
+      DB_PORT: '3306'
+      DB_USER: 'root'
+      DB_PASSWORD: 'password'
+      DB_NAME: 'desafio_mysql_node_nginx'
+    depends_on:
+      mysql:
+        condition: service_healthy
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    image: paulozaneripe/nginx
+    container_name: nginx
+    networks:
+      - mysql_node_nginx_net
+    ports:
+      - '8080:80'
+    depends_on:
+      - node
+volumes:
+  node_modules:
+  mysql-volume:
